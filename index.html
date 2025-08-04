@@ -1,0 +1,1573 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Ascend: God-Tier Edition</title>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .dashboard-card { @apply bg-base-100/50 border border-base-300 backdrop-blur-xl; }
+        .calendar-day { @apply flex items-center justify-center h-10 border border-base-200 rounded-md cursor-pointer transition-colors hover:bg-base-200 relative; }
+        .calendar-day.today { @apply bg-primary text-primary-content font-bold; }
+        .flashcard-container { perspective: 1000px; }
+        .card-flipper { position: relative; width: 100%; height: 200px; transition: transform 0.6s; transform-style: preserve-3d; cursor: pointer; }
+        .card-flipper.flipped { transform: rotateY(180deg); }
+        .card-front, .card-back { @apply absolute w-full h-full backface-hidden flex items-center justify-center p-4 text-center rounded-lg text-white font-semibold text-xl; }
+        .card-front { @apply bg-primary; }
+        .card-back { @apply bg-success; transform: rotateY(180deg); }
+        .flashcard-nav { @apply flex justify-between items-center mt-4; }
+        .flashcard-nav button { @apply btn btn-sm btn-ghost; }
+        .flashcard-nav button:disabled { @apply btn-disabled; }
+        .quiz-option.correct { @apply btn-success; }
+        .quiz-option.incorrect { @apply btn-error; }
+        .theme-btn.active { @apply bg-primary text-primary-content; }
+        .required-marks {
+            @apply font-bold text-center;
+        }
+        .marks-safe {
+            @apply text-success;
+        }
+        .marks-warning {
+            @apply text-warning;
+        }
+        .marks-danger {
+            @apply text-error;
+        }
+    </style>
+</head>
+<body>
+    <div id="loadingOverlay" class="fixed inset-0 bg-base-100 flex items-center justify-center z-50"><div class="text-center"><div class="loading loading-lg loading-spinner text-primary"></div><p class="mt-4">Initializing Ascend...</p></div></div>
+    
+    <div id="loginOverlay" class="fixed inset-0 bg-base-100 flex flex-col items-center justify-center z-40 p-4">
+        <div class="w-full max-w-sm">
+            <div class="text-center mb-8">
+                <h1 class="text-5xl font-extrabold">Project: <span class="text-primary">Ascend</span></h1>
+                <p class="text-base-content/70 mt-2">Your AI-Powered Academic Co-Pilot</p>
+            </div>
+            <div id="authForm" data-mode="login" class="card bg-base-100 shadow-xl p-8 space-y-4">
+                <button id="signInWithGoogleBtn" class="btn btn-outline w-full">
+                    <img src="https://www.google.com/images/branding/googlelogo/1x/googlelogo_color_272x92dp.png" alt="Google logo" class="h-6 mr-3">
+                    Sign in with Google
+                </button>
+                <div class="divider">OR</div>
+                <h2 id="authTitle" class="text-xl font-bold text-center">Login with Email</h2>
+                <input id="emailInput" type="email" placeholder="Email Address" class="input input-bordered w-full">
+                <input id="passwordInput" type="password" placeholder="Password" class="input input-bordered w-full">
+                <div id="confirmPasswordGroup" class="hidden">
+                    <input id="confirmPasswordInput" type="password" placeholder="Confirm Password" class="input input-bordered w-full">
+                </div>
+                <p id="authError" class="text-error text-xs text-center h-4"></p>
+                <button id="authButton" class="btn btn-primary w-full">
+                    Login
+                </button>
+                <p id="authToggleText" class="text-xs text-center text-base-content/70">
+                    Don't have an account? <span class="font-bold text-primary cursor-pointer">Sign Up</span>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div id="appContainer" class="hidden">
+        <div class="container mx-auto p-4 md:p-6">
+            <header class="flex justify-between items-start mb-6">
+                <div>
+                    <div class="flex items-center space-x-3">
+                        <div class="avatar">
+                            <div class="w-10 rounded-full">
+                                <img id="userProfilePic" src="" alt="User Profile">
+                            </div>
+                        </div>
+                        <div>
+                            <h1 id="userProfileName" class="text-xl font-bold">User</h1>
+                            <p id="userIdDisplay" class="text-xs text-base-content/50"></p>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="text-right">
+                        <span class="text-xs font-bold text-base-content/50">ASCEND SCORE</span>
+                        <p id="ascendScoreDisplay" class="text-2xl font-black text-primary">0</p>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-xs font-bold text-base-content/50">STUDY STREAK</span>
+                        <p class="text-2xl font-black text-amber-500"><i class="fa-solid fa-fire text-amber-400"></i> <span id="studyStreakDisplay">0</span></p>
+                    </div>
+                    <button id="openFocusBtn" class="btn btn-primary"><i class="fa-solid fa-crosshairs mr-2"></i>Focus</button>
+                </div>
+            </header>
+            <main class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2 space-y-6">
+                    <div id="gpaCalculator" class="dashboard-card p-6 rounded-2xl">
+                        <div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold">GPA Command Center</h2><button id="showBriefingBtn" class="btn btn-sm btn-warning">Daily Briefing</button></div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6"><div class="text-center p-4 bg-base-200 rounded-lg"><span class="text-sm text-base-content/50">Current SGPA</span><p id="sgpaDisplay" class="text-5xl font-extrabold">0.00</p></div><div class="text-center p-4 bg-base-200 rounded-lg"><label for="targetGpaInput" class="text-sm text-base-content/50">Target SGPA</label><input type="number" id="targetGpaInput" step="0.1" class="text-5xl font-extrabold text-primary bg-transparent w-full text-center outline-none" value="8.5"></div></div>
+                        <div class="grid grid-cols-12 gap-2 items-center mb-2 text-xs font-semibold text-base-content/50 px-2"><span class="col-span-4">Subject</span><span class="col-span-2">Credits</span><span class="col-span-2">Grade Pt.</span><span class="col-span-3 text-center">Target GP</span><span class="col-span-1"></span></div>
+                        <div id="subjectsContainer" class="mb-4"></div>
+                        <div class="grid grid-cols-2 gap-4 mt-4">
+                            <button id="addSubjectBtn" class="btn btn-outline btn-primary w-full">+ Add Subject</button>
+                            <button id="archiveSemesterBtn" class="btn btn-outline btn-success w-full"><i class="fa-solid fa-archive mr-2"></i>Finalize & Archive</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Marks Forecaster Section -->
+                    <div id="marksForecaster" class="dashboard-card p-6 rounded-2xl">
+                        <h2 class="text-xl font-bold mb-4">Marks Forecaster</h2>
+                        <p class="text-sm text-base-content/70 mb-4">Based on your current internal marks (out of 70), this tool calculates the marks you need in your final exams (out of 30) to achieve your target GPA.</p>
+                        <div class="grid grid-cols-12 gap-2 items-center mb-2 text-xs font-semibold text-base-content/50 px-2">
+                            <span class="col-span-5">Subject</span>
+                            <span class="col-span-2">Internal Marks (/70)</span>
+                            <span class="col-span-2 text-center">Target GP</span>
+                            <span class="col-span-3 text-center">Final Target (/30)</span>
+                        </div>
+                        <div id="marksForecasterContainer" class="space-y-2"></div>
+                    </div>
+                    
+                    <div id="attendanceTracker" class="dashboard-card p-6 rounded-2xl">
+                        <h2 class="text-xl font-bold mb-4">Attendance Command Center</h2>
+                        <div class="grid grid-cols-12 gap-2 items-center mb-2 text-xs font-semibold text-base-content/50 px-2">
+                            <span class="col-span-4">Subject</span>
+                            <span class="col-span-2">Total</span>
+                            <span class="col-span-2">Attended</span>
+                            <span class="col-span-2 text-center">%</span>
+                            <span class="col-span-2 text-center">Buffer Days</span>
+                        </div>
+                        <div id="attendanceContainer" class="space-y-2"></div>
+                    </div>
+                    <div class="dashboard-card p-6 rounded-2xl"><div class="flex justify-between items-center mb-4"><h2 id="calendarHeader" class="text-xl font-bold"></h2><div class="join"><button id="prevMonthBtn" class="btn btn-sm join-item">&lt;</button><button id="nextMonthBtn" class="btn btn-sm join-item">&gt;</button></div></div><div id="calendarGrid" class="grid grid-cols-7 gap-1 text-sm"></div></div>
+                </div>
+                <div class="space-y-6">
+                    <div id="todoSection" class="dashboard-card p-6 rounded-2xl flex flex-col"><div class="flex justify-between items-center"><h2 class="text-xl font-bold mb-4">Mission Control</h2><button id="openAiTutorBtn" class="btn btn-sm btn-primary mb-4">✨ Ascend AI</button></div><div id="todoListContainer" class="space-y-2 mb-4 flex-grow max-h-60 overflow-y-auto"></div><div class="join w-full mt-auto"><input type="text" id="todoInput" class="input input-bordered join-item w-full" placeholder="New mission..."><button class="btn btn-success join-item add-todo-btn">Add</button></div></div>
+                    <div id="recommendationsSection" class="dashboard-card p-6 rounded-2xl">
+                        <h2 class="text-xl font-bold mb-4">AI Recommendations</h2>
+                        <div id="recommendationsContainer" class="space-y-2"></div>
+                    </div>
+                    <div id="knowledgeBase" class="dashboard-card p-6 rounded-2xl">
+                        <h2 class="text-xl font-bold mb-4">Study Materials</h2>
+                        <div id="studyMaterialsContainer" class="space-y-3 mb-4"></div>
+                        <label id="fileUploadLabel" for="fileUpload" class="btn btn-outline btn-info w-full"><i class="fa-solid fa-upload mr-2"></i>Upload Notes (PDF)</label>
+                        <input type="file" id="fileUpload" class="hidden" accept=".pdf">
+                    </div>
+                    <div id="syllabusSection" class="dashboard-card p-6 rounded-2xl">
+                         <h2 class="text-xl font-bold mb-4">Syllabus Intelligence</h2>
+                         <p class="text-xs text-base-content/50 mb-3">Upload a syllabus to automatically import subjects, deadlines, and exams.</p>
+                         <label id="syllabusUploadLabel" for="syllabusUpload" class="btn btn-outline btn-secondary w-full"><i class="fa-solid fa-book-reader mr-2"></i>Import Syllabus (PDF)</label>
+                         <input type="file" id="syllabusUpload" class="hidden" accept=".pdf">
+                         <div id="syllabusStatus" class="text-center text-xs mt-2 h-4"></div>
+                    </div>
+                </div>
+            </main>
+            <footer class="mt-6 flex justify-between items-center">
+                <div class="flex items-center space-x-4">
+                    <button id="examOverdriveBtn" class="btn btn-error animate-pulse hover:animate-none"><i class="fa-solid fa-bolt mr-2"></i>Exam Overdrive</button>
+                    <button id="openAnalyticsBtn" class="btn btn-success"><i class="fa-solid fa-chart-line mr-2"></i>Analytics</button>
+                    <button id="openKnowledgeGraphBtn" class="btn btn-info"><i class="fa-solid fa-brain mr-2"></i>Knowledge Graph</button>
+                </div>
+                <button id="openSettingsBtn" class="btn btn-ghost btn-circle"><i class="fa-solid fa-gear text-xl"></i></button>
+            </footer>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="knowledgeGraphModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center z-50 p-4 text-white"><div class="w-full h-full max-w-6xl max-h-[80vh] dashboard-card rounded-2xl p-4 flex flex-col"><div class="flex justify-between items-center mb-4"><h2 class="text-2xl font-bold text-sky-400">Knowledge Graph</h2><button id="closeKnowledgeGraphBtn" class="btn btn-sm btn-ghost btn-circle">&times;</button></div><div id="knowledgeGraphContainer" class="flex-grow w-full h-full"></div></div></div>
+    <div id="focusModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center z-50 p-4 text-white"><h2 class="text-4xl font-black mb-2">Focus Flow</h2><p class="text-slate-400 mb-8">Eliminate distractions. Do deep work.</p><div id="focusTimeDisplay" class="text-8xl font-black mb-8">25:00</div><div class="flex items-center space-x-4 mb-8"><select id="focusDuration" class="select select-bordered"><option value="25">25 min</option><option value="45">45 min</option><option value="60">60 min</option></select><button id="startFocusTimerBtn" class="btn btn-primary btn-lg">Start</button></div><div class="w-full max-w-md"><iframe width="100%" height="150" src="https://www.youtube.com/embed/jfKfPfyJRdk?autoplay=1&controls=0&loop=1&playlist=jfKfPfyJRdk" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div><button id="closeFocusBtn" class="btn btn-sm btn-ghost btn-circle absolute top-4 right-4">&times;</button></div>
+    <div id="settingsModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"><div class="dashboard-card rounded-2xl w-full max-w-md p-6"><div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold">Settings</h2><button id="closeSettingsBtn" class="btn btn-sm btn-ghost btn-circle">&times;</button></div><div class="mt-4"><label class="block mb-2 text-sm font-medium">Theme</label><select id="themeSelector" class="select select-bordered w-full"><option value="system">System Default</option><option value="light">Light</option><option value="dark">Dark</option><option value="cupcake">Cupcake</option><option value="synthwave">Synthwave</option><option value="retro">Retro</option><option value="cyberpunk">Cyberpunk</option><option value="valentine">Valentine</option><option value="aqua">Aqua</option></select></div><div class="flex justify-between mt-6"><button id="signOutBtn" class="btn btn-outline btn-error">Sign Out</button><button id="saveSettingsBtn" class="btn btn-primary">Save</button></div></div></div>
+    <div id="analyticsModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"><div class="dashboard-card rounded-2xl w-full max-w-4xl p-6 h-[80vh] flex flex-col"><div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold">Your Academic Analytics</h2><button id="closeAnalyticsBtn" class="btn btn-sm btn-ghost btn-circle">&times;</button></div><div class="flex-grow overflow-y-auto grid grid-cols-1 lg:grid-cols-2 gap-6"><div class="p-4 bg-base-200 rounded-lg"><h3 class="font-bold text-lg mb-2 text-primary">SGPA Trend</h3><canvas id="gpaTrendChart"></canvas></div><div class="p-4 bg-base-200 rounded-lg"><h3 class="font-bold text-lg mb-2 text-primary">Overall Grade Distribution</h3><canvas id="gradeDistChart"></canvas></div></div></div></div>
+    <div id="examOverdriveLoading" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50"><div class="text-center text-white"><div class="loading loading-lg loading-spinner text-primary"></div><p class="mt-4">Ascend AI is generating your personalized exam battle plan...</p></div></div>
+    <div id="briefingModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-40 p-4"><div class="dashboard-card rounded-2xl w-full max-w-lg p-6"><div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold text-warning">Your Daily Briefing</h2><button id="closeBriefingBtn" class="btn btn-sm btn-ghost btn-circle">&times;</button></div><div id="briefingLoading" class="text-center p-8"><div class="loading loading-lg loading-spinner text-warning"></div><p class="mt-4">AI is preparing your daily strategy...</p></div><div id="briefingContent" class="prose prose-sm md:prose-base max-w-none"></div></div></div>
+    <div id="studyAidModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-40 p-4"><div class="dashboard-card rounded-2xl w-full max-w-2xl p-6 h-[80vh] flex flex-col"><div class="flex justify-between items-center mb-4"><h2 id="studyAidTitle" class="text-xl font-bold text-primary"></h2><button id="closeStudyAidBtn" class="btn btn-sm btn-ghost btn-circle">&times;</button></div><div id="studyAidContent" class="flex-grow overflow-y-auto pr-2"></div></div></div>
+    <div id="audioPlayerModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-40 p-4"><div class="dashboard-card rounded-2xl w-full max-w-md p-6"><div class="flex justify-between items-center mb-4"><h2 id="audioPlayerTitle" class="text-lg font-bold"></h2><button id="closeAudioPlayerBtn" class="btn btn-sm btn-ghost btn-circle">&times;</button></div><p id="audioPlayerStatus" class="text-center text-base-content/70 mb-4"></p><div id="audioPlayerControls" class="flex justify-center space-x-4"><button id="playBtn" class="btn btn-ghost btn-circle text-2xl"><i class="fa-solid fa-play"></i></button><button id="pauseBtn" class="btn btn-ghost btn-circle text-2xl"><i class="fa-solid fa-pause"></i></button><button id="resumeBtn" class="btn btn-ghost btn-circle text-2xl"><i class="fa-solid fa-play-circle"></i></button><button id="stopBtn" class="btn btn-ghost btn-circle text-2xl"><i class="fa-solid fa-stop"></i></button></div></div></div>
+    <div id="eventModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-40 p-4"><div class="dashboard-card rounded-2xl w-full max-w-md p-6"><h3 id="eventModalDate" class="text-lg font-bold mb-4"></h3><textarea id="eventText" class="textarea textarea-bordered w-full h-24 mb-4" placeholder="What was taught? Any notes?"></textarea><div class="form-control"><label class="label cursor-pointer"><span class="label-text">Mark as Absent</span><input id="absenceCheckbox" type="checkbox" class="toggle toggle-warning"></label></div><div class="flex justify-end space-x-2 mt-4"><button id="closeEventModalBtn" class="btn">Cancel</button><button id="saveEventBtn" class="btn btn-primary">Save</button></div></div></div>
+    <div id="aiTutorModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-40 p-4"><div class="dashboard-card rounded-2xl w-full max-w-2xl h-[80vh] flex flex-col"><div class="flex justify-between items-center p-4 border-b border-base-300"><h2 class="text-xl font-bold text-primary">✨ Ascend AI Tutor</h2><div><button id="clearAiChatBtn" class="btn btn-xs btn-ghost mr-2">Clear Chat</button><button id="closeAiTutorBtn" class="btn btn-sm btn-ghost btn-circle">&times;</button></div></div><div id="aiTutorContent" class="flex-grow p-4 overflow-y-auto flex flex-col space-y-4"></div><div id="aiTutorLoading" class="hidden p-4 text-center text-sm text-base-content/50">Ascend AI is thinking...</div><div id="aiTutorActions" class="hidden p-2 border-t border-base-300 flex items-center justify-center space-x-2"></div><div class="p-4 border-t border-base-300 flex space-x-2"><input type="text" id="aiTutorInput" class="input input-bordered w-full" placeholder="Ask about your subjects, concepts, or notes..."><button id="sendAiMsgBtn" class="btn btn-primary">Send</button></div></div></div>
+
+    <script type="module">
+        // Firebase Imports
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- CONFIGURATION ---
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { 
+            apiKey: "AIzaSyD6LGG3BTaeiAZ3frwylCGJNFreDOM1dG0", 
+            authDomain: "my-guide-82817.firebaseapp.com", 
+            projectId: "my-guide-82817" 
+        };
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'project-ascend-god-tier';
+        
+        // --- FIREBASE & APP STATE ---
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        let userId = null, userDataUnsubscribe = null, currentUserData = {};
+        let currentMonth = new Date().getMonth(), currentYear = new Date().getFullYear();
+        let focusTimerInterval = null;
+
+        // --- DOM ELEMENTS ---
+        let sgpaDisplay, subjectsContainer, todoListContainer, todoInput, calendarGrid, calendarHeader, attendanceContainer, marksForecasterContainer;
+        let aiTutorModal, eventModal, briefingModal, studyAidModal, audioPlayerModal, settingsModal, analyticsModal, focusModal, knowledgeGraphModal;
+        let briefingContent, briefingLoading, studyAidTitle, studyAidContent, audioPlayerTitle, audioPlayerStatus, audioPlayerControls;
+        let eventModalDate, eventText, absenceCheckbox, aiTutorContent, aiTutorInput, aiTutorLoading, aiTutorActions;
+        let loginOverlay, appContainer, loadingOverlay;
+
+        // --- AUTHENTICATION ---
+        async function setupAuth() {
+            onAuthStateChanged(auth, (user) => {
+                loadingOverlay.style.display = 'none';
+
+                if (user) {
+                    userId = user.uid;
+                    loginOverlay.style.display = 'none';
+                    appContainer.style.display = 'block';
+                    
+                    const userProfileName = document.getElementById('userProfileName');
+                    const userProfilePic = document.getElementById('userProfilePic');
+                    
+                    const displayName = user.displayName || user.email?.split('@')[0] || 'User';
+                    userProfileName.textContent = displayName;
+                    userProfilePic.src = user.photoURL || `https://placehold.co/40x40/6366f1/white?text=${displayName[0].toUpperCase()}`;
+                    userProfilePic.style.display = 'block';
+                    
+                    loadUserData();
+                } else {
+                    loginOverlay.style.display = 'flex';
+                    appContainer.style.display = 'none';
+                    if (userDataUnsubscribe) {
+                        userDataUnsubscribe();
+                    }
+                }
+            }, (error) => {
+                console.error("Auth State Error:", error);
+                loadingOverlay.innerHTML = `<p class="text-red-500">Could not connect to authentication service. Check Firebase setup.</p>`;
+            });
+        }
+
+        async function handleAuthAction() {
+            const email = document.getElementById('emailInput').value.trim();
+            const password = document.getElementById('passwordInput').value;
+            const confirmPassword = document.getElementById('confirmPasswordInput').value;
+            const authForm = document.getElementById('authForm');
+            const isSignUp = authForm.dataset.mode === 'signup';
+            const authErrorEl = document.getElementById('authError');
+            authErrorEl.textContent = '';
+
+            if (!email || password.length < 6) {
+                authErrorEl.textContent = 'Please enter a valid email and a password of at least 6 characters.';
+                return;
+            }
+
+            if (isSignUp && password !== confirmPassword) {
+                authErrorEl.textContent = 'Passwords do not match.';
+                return;
+            }
+
+            try {
+                if (isSignUp) {
+                    await createUserWithEmailAndPassword(auth, email, password);
+                } else {
+                    await signInWithEmailAndPassword(auth, email, password);
+                }
+            } catch (error) {
+                console.error("Authentication Error:", error.code, error.message);
+                if (error.code === 'auth/operation-not-allowed') {
+                    authErrorEl.textContent = "Error: This sign-in method is not enabled. Please go to your Firebase Console -> Authentication -> Sign-in method and enable the Email/Password provider.";
+                } else {
+                    authErrorEl.textContent = error.message;
+                }
+            }
+        }
+
+        async function signInWithGoogle() {
+            const provider = new GoogleAuthProvider();
+            try {
+                await signInWithPopup(auth, provider);
+            } catch (error) {
+                console.error("Google Sign-In Error:", error);
+                const authErrorEl = document.getElementById('authError');
+                if (error.code === 'auth/operation-not-allowed') {
+                     authErrorEl.textContent = "Error: Google Sign-in is not enabled. Please enable it in your Firebase Console.";
+                } else {
+                    authErrorEl.textContent = "Could not sign in with Google. Please try again.";
+                }
+            }
+        }
+
+        function toggleAuthMode() {
+            const authForm = document.getElementById('authForm');
+            const authButton = document.getElementById('authButton');
+            const toggleText = document.getElementById('authToggleText');
+            const confirmPasswordGroup = document.getElementById('confirmPasswordGroup');
+            const authTitle = document.getElementById('authTitle');
+            const isSignUp = authForm.dataset.mode === 'signup';
+
+            if (isSignUp) {
+                authForm.dataset.mode = 'login';
+                authButton.textContent = 'Login';
+                authTitle.textContent = 'Login to Ascend';
+                toggleText.innerHTML = `Don't have an account? <span class="font-bold text-primary cursor-pointer">Sign Up</span>`;
+                confirmPasswordGroup.classList.add('hidden');
+            } else {
+                authForm.dataset.mode = 'signup';
+                authButton.textContent = 'Create Account';
+                authTitle.textContent = 'Create Your Account';
+                toggleText.innerHTML = `Already have an account? <span class="font-bold text-primary cursor-pointer">Login</span>`;
+                confirmPasswordGroup.classList.remove('hidden');
+            }
+        }
+
+        async function appSignOut() {
+            try {
+                await signOut(auth);
+            } catch (error) {
+                console.error("Sign Out Error:", error);
+            }
+        }
+
+        // --- DATA HANDLING ---
+        async function loadUserData() {
+            if (!userId) return;
+            const userDocRef = doc(db, "artifacts", appId, "users", userId);
+            userDataUnsubscribe = onSnapshot(userDocRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    currentUserData = docSnap.data();
+                    applyTheme(currentUserData.theme || 'system');
+                    if (!currentUserData.lastBriefingDate || new Date(currentUserData.lastBriefingDate).toDateString() !== new Date().toDateString()) {
+                        generateDailyBriefing();
+                    }
+                } else {
+                    currentUserData = {
+                        subjects: [ 
+                            { name: "Data Structures", credits: 4, gradePoint: 7, totalClasses: 20, attendedClasses: 18, internalMarks: 50 }, 
+                            { name: "Algorithms", credits: 4, gradePoint: 5, totalClasses: 20, attendedClasses: 15, internalMarks: 40 } 
+                        ],
+                        todos: [{ text: "Review Big O notation", completed: false, completedDate: null }],
+                        calendarEvents: { [`${new Date().getFullYear()}-${new Date().getMonth() + 1}-${new Date().getDate()}`]: { text: "Semester Kick-off!", type: "event" } },
+                        studyMaterials: {}, aiChatHistory: [], targetGpa: 8.5, semesterHistory: [], apiKey: "", theme: 'system', studyStreak: 0, lastCompletedDate: null, knowledgeGaps: [], examTimers: [{name: "Final Exams", date: new Date(new Date().getFullYear(), 11, 15).toISOString().split('T')[0]}]
+                    };
+                    setDoc(userDocRef, currentUserData);
+                    applyTheme('system');
+                }
+                updateAllUI();
+            }, (error) => { console.error("Firestore error:", error); document.getElementById('loadingOverlay').innerHTML = `<p>Data Load Failed. Check Firestore Rules.</p>`; });
+        }
+        
+        async function saveUserData() { if (!userId || !currentUserData) return; await setDoc(doc(db, "artifacts", appId, "users", userId), currentUserData, { merge: true }); }
+        
+        // --- UI RENDERERS ---
+        function updateAllUI() { 
+            renderGpaCalculator(); 
+            renderTodos(); 
+            renderCalendar(currentYear, currentMonth); 
+            renderStudyMaterials(); 
+            updateHeaderMetrics(); 
+            renderRecommendations(); 
+            renderAttendanceTracker(); 
+            renderMarksForecaster(); // NEW: Marks forecaster
+            startExamCountdown(); 
+        }
+        
+        function renderGpaCalculator() {
+            const subjects = currentUserData.subjects || [];
+            const targetGpa = currentUserData.targetGpa || 8.5;
+            let totalCredits = subjects.reduce((sum, sub) => sum + (parseFloat(sub.credits) || 0), 0);
+            let weightedGpSum = subjects.reduce((sum, sub) => sum + ((parseFloat(sub.gradePoint) || 0) * (parseFloat(sub.credits) || 0)), 0);
+            const sgpa = totalCredits > 0 ? (weightedGpSum / totalCredits) : 0;
+            sgpaDisplay.textContent = sgpa.toFixed(2);
+            document.getElementById('targetGpaInput').value = targetGpa;
+            subjectsContainer.innerHTML = '';
+            subjects.forEach((subject, index) => {
+                const subjectEl = document.createElement('div');
+                subjectEl.className = 'grid grid-cols-12 gap-2 items-center mb-2 text-sm';
+                const currentGradePoint = parseFloat(subject.gradePoint) || 0;
+                const currentCredits = parseFloat(subject.credits) || 0;
+                
+                const otherSubjectsWeightedSum = weightedGpSum - (currentGradePoint * currentCredits);
+                
+                let requiredGp = 0;
+                if (currentCredits > 0) {
+                    requiredGp = ((targetGpa * totalCredits) - otherSubjectsWeightedSum) / currentCredits;
+                }
+                
+                const actionableTargetGp = Math.ceil(requiredGp);
+                
+                let targetGpColor = "text-base-content/50";
+                if (actionableTargetGp > 10) {
+                    targetGpColor = "text-error";
+                } else if (currentGradePoint >= actionableTargetGp) {
+                    targetGpColor = "text-success";
+                } else if (actionableTargetGp > currentGradePoint) {
+                    targetGpColor = "text-warning";
+                }
+
+                subjectEl.innerHTML = `<input type="text" value="${subject.name}" class="input input-bordered input-sm col-span-4" data-index="${index}" data-field="name"><input type="number" value="${currentCredits}" class="input input-bordered input-sm col-span-2" data-index="${index}" data-field="credits" step="0.5"><input type="number" value="${currentGradePoint}" class="input input-bordered input-sm col-span-2" data-index="${index}" data-field="gradePoint" min="0" max="10" step="1"><div class="col-span-3 text-center font-bold ${targetGpColor}">${actionableTargetGp > 10 ? ">10" : actionableTargetGp}</div><button class="btn btn-xs btn-ghost delete-subject-btn" data-index="${index}">&times;</button>`;
+                subjectsContainer.appendChild(subjectEl);
+            });
+        }
+        
+        function renderTodos() {
+            const todos = currentUserData.todos || [];
+            todoListContainer.innerHTML = todos.length ? '' : `<p class="text-base-content/50 text-sm p-4 text-center">No missions. Add one!</p>`;
+            todos.forEach((todo, index) => {
+                const todoEl = document.createElement('div');
+                todoEl.className = `flex items-center justify-between p-2 rounded-md transition-all ${todo.completed ? 'bg-success/10' : 'bg-base-200'}`;
+                todoEl.innerHTML = `<div class="flex items-center space-x-3"><input type="checkbox" class="toggle toggle-success toggle-sm toggle-todo-cb" data-index="${index}" ${todo.completed ? 'checked' : ''}><span class="text-sm ${todo.completed ? 'line-through text-base-content/50' : 'text-base-content'}">${todo.text}</span></div><button class="btn btn-xs btn-ghost delete-todo-btn" data-index="${index}">&times;</button>`;
+                todoListContainer.appendChild(todoEl);
+            });
+        }
+        
+        function renderCalendar(year, month) {
+            const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+            calendarHeader.textContent = `${monthNames[month]} ${year}`;
+            calendarGrid.innerHTML = '';
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const today = new Date();
+
+            const dayHeaders = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            dayHeaders.forEach(day => {
+                const dayHeaderEl = document.createElement('div');
+                dayHeaderEl.className = 'text-center font-bold text-xs text-base-content/50';
+                dayHeaderEl.textContent = day;
+                calendarGrid.appendChild(dayHeaderEl);
+            });
+
+            for (let i = 0; i < firstDay; i++) {
+                 const emptyCell = document.createElement('div');
+                 calendarGrid.appendChild(emptyCell);
+            }
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dayEl = document.createElement('div');
+                const dateKey = `${year}-${month + 1}-${day}`;
+                
+                let classes = 'calendar-day';
+                if (year === today.getFullYear() && month === today.getMonth() && day === today.getDate()) {
+                    classes += ' today';
+                }
+                
+                const event = currentUserData.calendarEvents?.[dateKey];
+                if (event) {
+                    if (event.type === 'exam') classes += ' ring-2 ring-error';
+                    else if (event.type === 'absence') classes += ' ring-2 ring-warning';
+                    else classes += ' ring-2 ring-info';
+                }
+                
+                dayEl.className = classes;
+                dayEl.textContent = day;
+                dayEl.dataset.date = dateKey;
+                calendarGrid.appendChild(dayEl);
+            }
+        }
+        
+        function renderStudyMaterials() {
+            const container = document.getElementById('studyMaterialsContainer');
+            const materials = currentUserData.studyMaterials || {};
+            container.innerHTML = Object.keys(materials).length ? '' : `<p class="text-base-content/50 text-sm p-4 text-center">Upload a PDF to build your knowledge base.</p>`;
+            Object.entries(materials).forEach(([filename, data]) => {
+                const materialEl = document.createElement('div');
+                materialEl.className = 'bg-base-200 p-3 rounded-lg space-y-3';
+                materialEl.innerHTML = `
+                    <div class="flex justify-between items-center text-sm"><span class="font-semibold text-base-content truncate pr-2">${filename}</span><button class="btn btn-xs btn-ghost delete-material-btn" data-filename="${filename}">&times;</button></div>
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                        <button class="btn btn-xs btn-outline btn-primary study-aid-btn" data-type="Summarize" data-filename="${filename}"><i class="fa-solid fa-file-alt mr-1"></i>Summarize</button>
+                        <button class="btn btn-xs btn-outline btn-primary study-aid-btn" data-type="Flashcards" data-filename="${filename}"><i class="fa-solid fa-clone mr-1"></i>Flashcards</button>
+                        <button class="btn btn-xs btn-outline btn-primary study-aid-btn" data-type="Quiz" data-filename="${filename}"><i class="fa-solid fa-question-circle mr-1"></i>Quiz</button>
+                        <button class="btn btn-xs btn-outline btn-primary study-aid-btn" data-type="Audio" data-filename="${filename}"><i class="fa-solid fa-headphones mr-1"></i>Audio</button>
+                    </div>`;
+                container.appendChild(materialEl);
+            });
+        }
+        
+        // --- NEW MARKS FORECASTER FEATURE ---
+        function renderMarksForecaster() {
+            const subjects = currentUserData.subjects || [];
+            marksForecasterContainer.innerHTML = '';
+
+            if (subjects.length === 0) {
+                marksForecasterContainer.innerHTML = `<p class="text-base-content/50 text-sm p-4 text-center">Add subjects in the GPA tracker to see them here.</p>`;
+                return;
+            }
+
+            // Calculate total credits and weighted sum
+            let totalCredits = 0;
+            let weightedGpSum = 0;
+            subjects.forEach(subject => {
+                const credits = parseFloat(subject.credits) || 0;
+                totalCredits += credits;
+                weightedGpSum += (parseFloat(subject.gradePoint) || 0) * credits;
+            });
+
+            subjects.forEach((subject, index) => {
+                const credits = parseFloat(subject.credits) || 0;
+                const currentGradePoint = parseFloat(subject.gradePoint) || 0;
+                const internalMarks = parseFloat(subject.internalMarks) || 0;
+
+                // Calculate required grade point for this subject
+                const otherSubjectsWeightedSum = weightedGpSum - (currentGradePoint * credits);
+                let requiredGp = 0;
+                if (credits > 0) {
+                    requiredGp = ((currentUserData.targetGpa * totalCredits) - otherSubjectsWeightedSum) / credits;
+                }
+
+                // Calculate required final marks
+                const requiredTotal = requiredGp * 10; // Convert GP to percentage
+                let requiredFinal = Math.max(0, requiredTotal - internalMarks);
+                let requiredFinalDisplay = requiredFinal.toFixed(0);
+                let requiredFinalClass = "marks-safe";
+                
+                if (requiredFinal > 30) {
+                    requiredFinalDisplay = ">30";
+                    requiredFinalClass = "marks-danger";
+                } else if (requiredFinal > 25) {
+                    requiredFinalClass = "marks-warning";
+                }
+
+                const el = document.createElement('div');
+                el.className = 'grid grid-cols-12 gap-2 items-center text-sm mb-2';
+                el.innerHTML = `
+                    <span class="col-span-5 truncate font-semibold text-base-content">${subject.name}</span>
+                    <input type="number" value="${internalMarks}" class="input input-bordered input-sm col-span-2 marks-forecaster-input" data-index="${index}" data-field="internalMarks" min="0" max="70">
+                    <span class="col-span-2 text-center font-bold">${requiredGp.toFixed(1)}</span>
+                    <span class="col-span-3 text-center required-marks ${requiredFinalClass}">${requiredFinalDisplay}/30</span>
+                `;
+                marksForecasterContainer.appendChild(el);
+            });
+        }
+
+        function handleMarksForecasterChange(e) {
+            const { index, field } = e.target.dataset;
+            if (index !== undefined && field) {
+                currentUserData.subjects[index][field] = parseInt(e.target.value) || 0;
+            }
+            renderMarksForecaster(); // Re-render to update required marks
+            saveUserData();
+        }
+
+        // --- FEATURE HANDLERS ---
+        function handleGpaChange(e) { 
+            const { index, field } = e.target.dataset; 
+            if (index !== undefined && field) {
+                currentUserData.subjects[index][field] = e.target.type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value;
+            } 
+            renderGpaCalculator(); 
+            renderAttendanceTracker(); 
+            renderMarksForecaster(); // Also update marks forecaster
+            saveUserData(); 
+        }
+        
+        function addSubject() { 
+            if (!currentUserData.subjects) currentUserData.subjects = []; 
+            currentUserData.subjects.push({ 
+                name: "New Subject", 
+                credits: 3, 
+                gradePoint: 0, 
+                totalClasses: 0, 
+                attendedClasses: 0, 
+                internalMarks: 0  // New field for marks forecaster
+            }); 
+            renderGpaCalculator(); 
+            renderAttendanceTracker(); 
+            renderMarksForecaster(); // Also update marks forecaster
+            saveUserData(); 
+        }
+        
+        function deleteSubject(index) { 
+            currentUserData.subjects.splice(index, 1); 
+            renderGpaCalculator(); 
+            renderAttendanceTracker(); 
+            renderMarksForecaster(); // Also update marks forecaster
+            saveUserData(); 
+        }
+        
+        function handleTodoAction(e) { 
+            const todos = currentUserData.todos || []; 
+            let changed = false; 
+            if (e.target.closest('.add-todo-btn')) { 
+                if (todoInput.value.trim()) { 
+                    todos.push({ text: todoInput.value.trim(), completed: false, completedDate: null }); 
+                    todoInput.value = ''; 
+                    changed = true; 
+                } 
+            } else if (e.target.classList.contains('toggle-todo-cb')) { 
+                const index = e.target.dataset.index; 
+                todos[index].completed = e.target.checked; 
+                todos[index].completedDate = e.target.checked ? new Date().toISOString() : null; 
+                changed = true; 
+            } else if (e.target.closest('.delete-todo-btn')) { 
+                todos.splice(e.target.dataset.index, 1); 
+                changed = true; 
+            } else { 
+                return; 
+            } 
+            currentUserData.todos = todos; 
+            if (changed) { 
+                updateStreak(); 
+                renderTodos(); 
+                saveUserData(); 
+            } 
+        }
+        
+        function changeMonth(offset) { 
+            currentMonth += offset; 
+            if (currentMonth < 0) { 
+                currentMonth = 11; 
+                currentYear--; 
+            } else if (currentMonth > 11) { 
+                currentMonth = 0; 
+                currentYear++; 
+            } 
+            renderCalendar(currentYear, currentMonth); 
+        }
+        
+        function openEventModal(dateKey) { 
+            eventModal.classList.remove('hidden'); 
+            eventModalDate.textContent = new Date(dateKey.replace(/-/g, '/')).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }); 
+            eventModal.dataset.date = dateKey; 
+            const event = currentUserData.calendarEvents?.[dateKey]; 
+            eventText.value = event?.text || ''; 
+            absenceCheckbox.checked = event?.type === 'absence'; 
+        }
+        
+        function saveEvent() { 
+            const dateKey = eventModal.dataset.date, eventTextValue = eventText.value.trim(), isAbsence = absenceCheckbox.checked; 
+            if (!currentUserData.calendarEvents) currentUserData.calendarEvents = {}; 
+            if (!currentUserData.todos) currentUserData.todos = []; 
+            if (eventTextValue === '') { 
+                delete currentUserData.calendarEvents[dateKey]; 
+            } else { 
+                currentUserData.calendarEvents[dateKey] = { text: eventTextValue, type: isAbsence ? 'absence' : 'event' }; 
+                const existingTodo = currentUserData.todos.find(todo => todo.text.includes(eventTextValue)); 
+                if (!existingTodo) { 
+                    const todoText = isAbsence ? `Get notes for: ${eventTextValue}` : `Review: ${eventTextValue}`; 
+                    currentUserData.todos.push({ text: todoText, completed: false }); 
+                } 
+            } 
+            eventModal.classList.add('hidden'); 
+            renderCalendar(currentYear, currentMonth); 
+            renderTodos(); 
+            saveUserData(); 
+        }
+        
+        async function handleFileUpload(e) { 
+            const file = e.target.files[0]; 
+            if (!file || file.type !== 'application/pdf') return; 
+            document.getElementById('fileUploadLabel').innerHTML = `<div class="spinner-small mx-auto"></div>`; 
+            pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js`; 
+            const reader = new FileReader(); 
+            reader.onload = async (event) => { 
+                try { 
+                    const pdf = await pdfjsLib.getDocument({ data: event.target.result }).promise; 
+                    let textContent = ''; 
+                    for (let i = 1; i <= pdf.numPages; i++) { 
+                        const page = await pdf.getPage(i); 
+                        const text = await page.getTextContent(); 
+                        textContent += text.items.map(s => s.str).join(' '); 
+                    } 
+                    if (!currentUserData.studyMaterials) currentUserData.studyMaterials = {}; 
+                    const prompt = `From the following text, identify and extract the top 5-7 most important keywords or concepts. Respond ONLY with a valid JSON array of strings. Example: ["Recursion", "Big O Notation"]. Text: ${textContent.substring(0, 8000)}`; 
+                    const concepts = JSON.parse(await callGemini(prompt, true)); 
+                    currentUserData.studyMaterials[file.name] = { content: textContent, uploaded: new Date().toISOString(), concepts: concepts }; 
+                    renderStudyMaterials(); 
+                    saveUserData(); 
+                } catch (error) { 
+                    console.error("PDF Error:", error); 
+                    alert(`Could not process PDF: ${error.message}`); 
+                } finally { 
+                    document.getElementById('fileUploadLabel').innerHTML = `<i class="fa-solid fa-upload mr-2"></i>Upload Study Material (PDF)`; 
+                    e.target.value = ''; 
+                } 
+            }; 
+            reader.readAsArrayBuffer(file); 
+        }
+        
+        function deleteMaterial(filename) { 
+            delete currentUserData.studyMaterials[filename]; 
+            renderStudyMaterials(); 
+            saveUserData(); 
+        }
+
+        // --- GOD-TIER AI FEATURES ---
+        async function callGemini(prompt, isJson = false) {
+            const keyToUse = "AIzaSyAHliiQxUgA1geRuSJRe89BcdD73Q3vSTc"; 
+            const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }], ...(isJson && { generationConfig: { responseMimeType: "application/json" } }) };
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${keyToUse}`;
+            const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            if (!response.ok) throw new Error(`API Error: ${response.status}.`);
+            const result = await response.json();
+            if (!result.candidates || !result.candidates[0].content.parts[0].text) throw new Error("Invalid API response.");
+            return result.candidates[0].content.parts[0].text;
+        }
+        
+        async function generateDailyBriefing() {
+            briefingModal.classList.remove('hidden');
+            briefingLoading.classList.remove('hidden');
+            briefingContent.innerHTML = '';
+            
+            try {
+                // Get today's date
+                const today = new Date();
+                const dayOfWeek = today.toLocaleDateString('en-US', { weekday: 'long' });
+                const dateStr = today.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+                
+                // Prepare subject data
+                const subjects = currentUserData.subjects || [];
+                const subjectList = subjects.map(sub => `${sub.name} (${sub.gradePoint}/10)`).join(', ');
+                
+                // Prepare prompt
+                const prompt = `You are Ascend AI, an academic assistant. Today is ${dayOfWeek}, ${dateStr}. The student has the following subjects: ${subjectList}. Their target GPA is ${currentUserData.targetGpa}. 
+                Based on their academic progress, generate a personalized daily briefing in markdown format with these sections:
+                
+                1. **Academic Forecast**: Highlight key upcoming deadlines or events from their calendar.
+                2. **GPA Strategy**: Provide specific recommendations for improving grades in weaker subjects.
+                3. **Today's Top Priority**: Suggest the most important study task for today.
+                4. **AI Insight**: Share an interesting fact or motivational quote related to their studies.
+                
+                Keep it concise (under 200 words) and encouraging. Use emojis where appropriate.`;
+                
+                const markdown = await callGemini(prompt);
+                displayBriefing(markdown);
+                currentUserData.lastBriefingDate = new Date().toISOString();
+                saveUserData();
+            } catch (error) {
+                briefingContent.innerHTML = `<p class="text-error">Could not generate briefing: ${error.message}</p>`;
+            } finally {
+                briefingLoading.classList.add('hidden');
+            }
+        }
+        
+        function displayBriefing(markdown) {
+            briefingContent.innerHTML = marked.parse(markdown);
+        }
+        
+        function showLastBriefing() {
+            briefingModal.classList.remove('hidden');
+            briefingLoading.classList.remove('hidden');
+            briefingContent.innerHTML = '';
+            
+            if (currentUserData.lastBriefingDate) {
+                const markdown = currentUserData.lastBriefing || 'No briefing available. Generating a new one...';
+                setTimeout(() => {
+                    displayBriefing(markdown);
+                    briefingLoading.classList.add('hidden');
+                }, 500);
+            } else {
+                generateDailyBriefing();
+            }
+        }
+        
+        async function generateStudyAids(filename, type) {
+            studyAidModal.classList.remove('hidden');
+            studyAidTitle.textContent = `Generating ${type}...`;
+            studyAidContent.innerHTML = '<div class="text-center p-8"><div class="loading loading-lg loading-spinner text-primary"></div><p class="mt-4">Ascend AI is processing your material...</p></div>';
+            
+            try {
+                const material = currentUserData.studyMaterials[filename];
+                if (!material) throw new Error('Material not found');
+                
+                let prompt = '';
+                switch(type) {
+                    case 'Summarize':
+                        prompt = `Create a concise, well-structured summary of the following text in markdown format. Include key points, concepts, and examples. Text: ${material.content.substring(0, 8000)}`;
+                        const summary = await callGemini(prompt);
+                        displaySummary(summary, filename);
+                        break;
+                    case 'Flashcards':
+                        prompt = `Generate 5-7 flashcards in JSON format from the following text. Each flashcard should have a front (question) and back (answer). Example: [{"front": "What is recursion?", "back": "A programming technique where a function calls itself."}]. Text: ${material.content.substring(0, 8000)}`;
+                        const flashcards = JSON.parse(await callGemini(prompt, true));
+                        displayFlashcards(flashcards, filename);
+                        break;
+                    case 'Quiz':
+                        prompt = `Create a 5-question multiple choice quiz from the following text. Each question should have 4 options and indicate the correct answer. Respond in JSON format: [{"question": "...", "options": ["A", "B", "C", "D"], "answer": "A"}]. Text: ${material.content.substring(0, 8000)}`;
+                        const quiz = JSON.parse(await callGemini(prompt, true));
+                        displayQuiz(quiz, filename);
+                        break;
+                    case 'Audio':
+                        await generateAudioLesson(filename);
+                        break;
+                }
+            } catch (error) {
+                studyAidContent.innerHTML = `<p class="text-error">Could not generate ${type}: ${error.message}</p>`;
+            }
+        }
+        
+        function displaySummary(markdown, title) {
+            studyAidTitle.textContent = `Summary: ${title}`;
+            studyAidContent.innerHTML = marked.parse(markdown);
+        }
+        
+        function displayFlashcards(cards, title) {
+            studyAidTitle.textContent = `Flashcards: ${title}`;
+            studyAidContent.innerHTML = '';
+            
+            if (!cards || !cards.length) {
+                studyAidContent.innerHTML = '<p class="text-error">No flashcards generated.</p>';
+                return;
+            }
+            
+            const container = document.createElement('div');
+            container.className = 'flashcard-container mb-4';
+            
+            const flipper = document.createElement('div');
+            flipper.className = 'card-flipper';
+            flipper.innerHTML = `
+                <div class="card-front flex flex-col items-center justify-center">
+                    <i class="fa-solid fa-lightbulb text-4xl mb-3"></i>
+                    <p>Click to flip</p>
+                </div>
+                <div class="card-back"></div>
+            `;
+            
+            const front = flipper.querySelector('.card-front');
+            const back = flipper.querySelector('.card-back');
+            
+            let currentIndex = 0;
+            back.textContent = cards[currentIndex].back;
+            
+            flipper.addEventListener('click', () => {
+                flipper.classList.toggle('flipped');
+            });
+            
+            const nav = document.createElement('div');
+            nav.className = 'flashcard-nav';
+            nav.innerHTML = `
+                <button class="prev-btn" ${currentIndex === 0 ? 'disabled' : ''}><i class="fa-solid fa-arrow-left"></i></button>
+                <span>${currentIndex + 1} / ${cards.length}</span>
+                <button class="next-btn" ${currentIndex === cards.length - 1 ? 'disabled' : ''}><i class="fa-solid fa-arrow-right"></i></button>
+            `;
+            
+            const updateCard = () => {
+                front.innerHTML = `
+                    <div class="text-center">
+                        <i class="fa-solid fa-lightbulb text-4xl mb-3"></i>
+                        <p>${cards[currentIndex].front}</p>
+                        <p class="text-sm mt-4">Click to flip</p>
+                    </div>
+                `;
+                back.textContent = cards[currentIndex].back;
+                nav.querySelector('.prev-btn').disabled = currentIndex === 0;
+                nav.querySelector('.next-btn').disabled = currentIndex === cards.length - 1;
+                nav.querySelector('span').textContent = `${currentIndex + 1} / ${cards.length}`;
+                flipper.classList.remove('flipped');
+            };
+            
+            nav.querySelector('.prev-btn').addEventListener('click', () => {
+                if (currentIndex > 0) {
+                    currentIndex--;
+                    updateCard();
+                }
+            });
+            
+            nav.querySelector('.next-btn').addEventListener('click', () => {
+                if (currentIndex < cards.length - 1) {
+                    currentIndex++;
+                    updateCard();
+                }
+            });
+            
+            container.appendChild(flipper);
+            studyAidContent.appendChild(container);
+            studyAidContent.appendChild(nav);
+        }
+        
+        function displayQuiz(questions, filename) {
+            studyAidTitle.textContent = `Quiz: ${filename}`;
+            studyAidContent.innerHTML = '';
+            
+            if (!questions || !questions.length) {
+                studyAidContent.innerHTML = '<p class="text-error">No quiz generated.</p>';
+                return;
+            }
+            
+            let score = 0;
+            let answered = 0;
+            const quizContainer = document.createElement('div');
+            quizContainer.className = 'space-y-6';
+            
+            questions.forEach((q, index) => {
+                const questionEl = document.createElement('div');
+                questionEl.className = 'quiz-question';
+                const optionsHtml = q.options.map(opt => `<button class="btn w-full justify-start quiz-option">${opt}</button>`).join('');
+                questionEl.innerHTML = `<p class="font-bold mb-2">${index + 1}. ${q.question}</p><div class="grid grid-cols-1 md:grid-cols-2 gap-2">${optionsHtml}</div>`;
+                quizContainer.appendChild(questionEl);
+                
+                questionEl.querySelectorAll('.quiz-option').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        questionEl.querySelectorAll('.quiz-option').forEach(b => b.disabled = true);
+                        if(btn.textContent === q.answer) {
+                            btn.classList.add('btn-success');
+                            score++;
+                        } else {
+                            btn.classList.add('btn-error');
+                            [...questionEl.querySelectorAll('.quiz-option')].find(b => b.textContent === q.answer).classList.add('btn-success');
+                            logKnowledgeGap(filename);
+                        }
+                        answered++;
+                        if (answered === questions.length) {
+                             const scoreEl = document.createElement('p');
+                             scoreEl.className = 'text-center text-2xl font-bold mt-6';
+                             scoreEl.textContent = `Quiz Complete! Your Score: ${score}/${questions.length}`;
+                             quizContainer.appendChild(scoreEl);
+                        }
+                    });
+                });
+            });
+            studyAidContent.appendChild(quizContainer);
+        }
+        
+        async function generateAudioLesson(filename) {
+            audioPlayerModal.classList.remove('hidden');
+            audioPlayerTitle.textContent = `Audio Lesson: ${filename}`;
+            audioPlayerStatus.textContent = 'Generating audio...';
+            audioPlayerControls.classList.add('hidden');
+            
+            try {
+                const material = currentUserData.studyMaterials[filename];
+                if (!material) throw new Error('Material not found');
+                
+                const prompt = `Create a concise audio script (under 500 words) summarizing the key points of the following text: ${material.content.substring(0, 4000)}`;
+                const script = await callGemini(prompt);
+                
+                // For demo purposes, we'll use the browser's speech synthesis
+                if ('speechSynthesis' in window) {
+                    audioPlayerStatus.textContent = 'Ready to play';
+                    audioPlayerControls.classList.remove('hidden');
+                    
+                    const utterance = new SpeechSynthesisUtterance(script);
+                    utterance.rate = 1.0;
+                    utterance.pitch = 1.0;
+                    utterance.volume = 1.0;
+                    
+                    document.getElementById('playBtn').onclick = () => speechSynthesis.speak(utterance);
+                    document.getElementById('pauseBtn').onclick = () => speechSynthesis.pause();
+                    document.getElementById('resumeBtn').onclick = () => speechSynthesis.resume();
+                    document.getElementById('stopBtn').onclick = () => speechSynthesis.cancel();
+                } else {
+                    throw new Error('Speech synthesis not supported in this browser');
+                }
+            } catch (error) {
+                audioPlayerStatus.textContent = `Error: ${error.message}`;
+            }
+        }
+        
+        function openAiTutor() { 
+            aiTutorModal.classList.remove('hidden'); 
+            renderAiChatHistory(); 
+        }
+        
+        function renderAiChatHistory() {
+            aiTutorContent.innerHTML = '';
+            (currentUserData.aiChatHistory || []).forEach(msg => { 
+                const msgEl = document.createElement('div');
+                msgEl.className = `chat ${msg.role === 'user' ? 'chat-end' : 'chat-start'}`;
+                msgEl.innerHTML = `<div class="chat-bubble ${msg.role === 'user' ? 'chat-bubble-primary' : ''}">${marked.parse(msg.parts[0].text)}</div>`;
+                aiTutorContent.appendChild(msgEl);
+            });
+            aiTutorContent.scrollTop = aiTutorContent.scrollHeight;
+        }
+
+        async function sendAiChatMessage() {
+            const userMessage = aiTutorInput.value.trim(); if (!userMessage) return;
+            if (!currentUserData.aiChatHistory) currentUserData.aiChatHistory = [];
+            currentUserData.aiChatHistory.push({ role: 'user', parts: [{ text: userMessage }] });
+            aiTutorInput.value = ''; 
+            aiTutorActions.classList.add('hidden');
+            renderAiChatHistory(); 
+            aiTutorLoading.classList.remove('hidden');
+            
+            const materialContext = Object.entries(currentUserData.studyMaterials || {}).map(([name, data]) => `--- START ${name} ---\n${data.content.substring(0, 4000)}\n--- END ${name} ---`).join('\n\n');
+            const prompt = `You are 'Ascend AI', a friendly Socratic tutor. Student's Data: Subjects & Grades: ${JSON.stringify(currentUserData.subjects)}, Target GPA: ${currentUserData.targetGpa}. Uploaded Materials Context: ${materialContext}. Conversation History (last 6): ${JSON.stringify(currentUserData.aiChatHistory.slice(-7, -1))}. The student's latest message: "${userMessage}". Your Task: Provide a helpful, encouraging response in markdown. Guide them to the answer.`;
+            try {
+                const modelResponse = await callGemini(prompt);
+                currentUserData.aiChatHistory.push({ role: 'model', parts: [{ text: modelResponse }] });
+                analyzeTutorResponseForActions(modelResponse, userMessage);
+            } catch (error) { console.error("AI Tutor Error:", error); currentUserData.aiChatHistory.push({ role: 'model', parts: [{ text: `I'm having trouble connecting right now: ${error.message}` }] }); }
+            finally { aiTutorLoading.classList.add('hidden'); renderAiChatHistory(); saveUserData(); }
+        }
+
+        function analyzeTutorResponseForActions(modelResponse, userMessage) {
+            aiTutorActions.innerHTML = '';
+            const lowerResponse = modelResponse.toLowerCase();
+            const lowerUserMessage = userMessage.toLowerCase();
+            const contextKeywords = ['explain', 'what is', 'concept', 'algorithm', 'theory', 'how does'];
+
+            if (contextKeywords.some(kw => lowerUserMessage.includes(kw) || lowerResponse.includes(kw))) {
+                const examplesBtn = document.createElement('button');
+                examplesBtn.innerHTML = `<i class="fa-solid fa-flask mr-2"></i>Find Real-World Examples`;
+                examplesBtn.className = 'btn btn-sm btn-outline btn-info';
+                examplesBtn.onclick = findRealWorldExamples;
+                aiTutorActions.appendChild(examplesBtn);
+
+                const quizBtn = document.createElement('button');
+                quizBtn.innerHTML = `<i class="fa-solid fa-question-circle mr-2"></i>Create a Pop Quiz`;
+                quizBtn.className = 'btn btn-sm btn-outline btn-accent';
+                quizBtn.onclick = createPopQuiz;
+                aiTutorActions.appendChild(quizBtn);
+                
+                aiTutorActions.classList.remove('hidden');
+            } else {
+                aiTutorActions.classList.add('hidden');
+            }
+        }
+
+        async function findRealWorldExamples() {
+            aiTutorActions.classList.add('hidden');
+            aiTutorLoading.classList.remove('hidden');
+            const conversationContext = currentUserData.aiChatHistory.slice(-4).map(m => `${m.role}: ${m.parts[0].text}`).join('\n');
+            const prompt = `Based on the following conversation, act as a research assistant and find 2-3 real-world applications or recent news articles related to the main technical concept being discussed. Respond in markdown with a brief summary for each and links if available. Conversation:\n\n${conversationContext}`;
+            try {
+                const modelResponse = await callGemini(prompt);
+                currentUserData.aiChatHistory.push({ role: 'model', parts: [{ text: `Here are some real-world examples I found:\n\n${modelResponse}` }] });
+            } catch (error) {
+                currentUserData.aiChatHistory.push({ role: 'model', parts: [{ text: `Sorry, I couldn't find examples right now: ${error.message}` }] });
+            } finally {
+                aiTutorLoading.classList.add('hidden');
+                renderAiChatHistory();
+                saveUserData();
+            }
+        }
+
+        async function createPopQuiz() {
+            aiTutorActions.classList.add('hidden');
+            aiTutorLoading.classList.remove('hidden');
+            const conversationContext = currentUserData.aiChatHistory.slice(-4).map(m => `${m.role}: ${m.parts[0].text}`).join('\n');
+            const prompt = `Based on the following conversation, create a 3-question multiple-choice pop quiz about the main concept. Respond ONLY with a valid JSON array of objects: [{"question": "...", "options": ["A", "B", "C", "D"], "answer": "A"}]. Conversation:\n\n${conversationContext}`;
+            try {
+                const responseText = await callGemini(prompt, true);
+                const quizData = JSON.parse(responseText);
+                const quizHtml = createInteractiveQuizHtml(quizData);
+                currentUserData.aiChatHistory.push({ role: 'model', parts: [{ text: `Let's test your knowledge! Here's a quick quiz:\n\n${quizHtml}` }] });
+            } catch (error) {
+                currentUserData.aiChatHistory.push({ role: 'model', parts: [{ text: `Sorry, I couldn't create a quiz right now: ${error.message}` }] });
+            } finally {
+                aiTutorLoading.classList.add('hidden');
+                renderAiChatHistory();
+                saveUserData();
+            }
+        }
+        
+        function createInteractiveQuizHtml(questions) {
+            let html = '';
+            questions.forEach((q, index) => {
+                html += `**${index + 1}. ${q.question}**\n`;
+                q.options.forEach(opt => {
+                    html += `- ${opt}\n`;
+                });
+                html += `\n`;
+            });
+            return html;
+        }
+
+        function clearAiChat() { currentUserData.aiChatHistory = []; renderAiChatHistory(); saveUserData(); }
+
+        // --- NEW V1.0 FEATURES ---
+        function archiveSemester() {
+            if (!confirm("Are you sure you want to archive this semester? This will reset your current progress.")) return;
+            
+            if (!currentUserData.semesterHistory) currentUserData.semesterHistory = [];
+            currentUserData.semesterHistory.push({
+                date: new Date().toISOString(),
+                subjects: [...currentUserData.subjects],
+                gpa: parseFloat(sgpaDisplay.textContent) || 0
+            });
+            
+            currentUserData.subjects = [];
+            currentUserData.todos = [];
+            currentUserData.calendarEvents = {};
+            currentUserData.studyMaterials = {};
+            
+            saveUserData();
+            updateAllUI();
+        }
+        
+        function getChartJsThemeOptions() {
+            const isDark = document.documentElement.getAttribute('data-theme').includes('dark') || 
+                           document.documentElement.getAttribute('data-theme') === 'synthwave' ||
+                           document.documentElement.getAttribute('data-theme') === 'cyberpunk';
+            
+            return {
+                backgroundColor: isDark ? 'rgba(30, 41, 59, 0.7)' : 'rgba(255, 255, 255, 0.7)',
+                borderColor: isDark ? '#60a5fa' : '#3b82f6',
+                color: isDark ? '#e2e8f0' : '#1e293b',
+                gridColor: isDark ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.2)'
+            };
+        }
+        
+        function showAnalytics() {
+            analyticsModal.classList.remove('hidden');
+            
+            // Simulate chart data
+            setTimeout(() => {
+                const theme = getChartJsThemeOptions();
+                
+                // GPA Trend Chart
+                const gpaCtx = document.getElementById('gpaTrendChart').getContext('2d');
+                new Chart(gpaCtx, {
+                    type: 'line',
+                    data: {
+                        labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6'],
+                        datasets: [{
+                            label: 'Your SGPA',
+                            data: [7.2, 7.5, 7.8, 8.1, 8.3, 8.5],
+                            backgroundColor: theme.backgroundColor,
+                            borderColor: theme.borderColor,
+                            borderWidth: 2,
+                            tension: 0.3,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { labels: { color: theme.color } }
+                        },
+                        scales: {
+                            y: {
+                                min: 6,
+                                max: 10,
+                                grid: { color: theme.gridColor },
+                                ticks: { color: theme.color }
+                            },
+                            x: {
+                                grid: { color: theme.gridColor },
+                                ticks: { color: theme.color }
+                            }
+                        }
+                    }
+                });
+                
+                // Grade Distribution Chart
+                const distCtx = document.getElementById('gradeDistChart').getContext('2d');
+                new Chart(distCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['A (9-10)', 'B (8-9)', 'C (7-8)', 'D (6-7)', 'E (5-6)'],
+                        datasets: [{
+                            label: 'Grades',
+                            data: [2, 3, 4, 1, 0],
+                            backgroundColor: [
+                                'rgba(54, 162, 235, 0.7)',
+                                'rgba(75, 192, 192, 0.7)',
+                                'rgba(255, 206, 86, 0.7)',
+                                'rgba(255, 159, 64, 0.7)',
+                                'rgba(255, 99, 132, 0.7)'
+                            ],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { labels: { color: theme.color } }
+                        }
+                    }
+                });
+            }, 500);
+        }
+        
+        async function activateExamOverdrive() {
+            examOverdriveLoading.classList.remove('hidden');
+            
+            try {
+                // Generate a personalized study plan
+                const prompt = `The student is preparing for exams. Their subjects: ${JSON.stringify(currentUserData.subjects)}. Target GPA: ${currentUserData.targetGpa}. 
+                Generate a comprehensive 7-day exam preparation plan in markdown format. Include:
+                - Day-by-day study schedule
+                - Recommended resources from their materials
+                - Practice strategies
+                - Time management tips`;
+                
+                const plan = await callGemini(prompt);
+                
+                // Create a new study material entry
+                if (!currentUserData.studyMaterials) currentUserData.studyMaterials = {};
+                currentUserData.studyMaterials["Exam Overdrive Plan.md"] = {
+                    content: plan,
+                    uploaded: new Date().toISOString(),
+                    concepts: ["Exam Preparation", "Study Schedule", "Revision Strategy"]
+                };
+                
+                // Add to todos
+                if (!currentUserData.todos) currentUserData.todos = [];
+                currentUserData.todos.push({
+                    text: "Review Exam Overdrive Plan",
+                    completed: false
+                });
+                
+                saveUserData();
+                alert("Exam Overdrive plan generated! Check your Study Materials.");
+            } catch (error) {
+                alert(`Could not generate plan: ${error.message}`);
+            } finally {
+                examOverdriveLoading.classList.add('hidden');
+            }
+        }
+        
+        async function handleSyllabusUpload(e) {
+            const file = e.target.files[0];
+            if (!file || file.type !== 'application/pdf') return;
+            
+            const status = document.getElementById('syllabusStatus');
+            status.textContent = "Processing syllabus...";
+            
+            try {
+                const reader = new FileReader();
+                reader.onload = async (event) => {
+                    try {
+                        const pdf = await pdfjsLib.getDocument({ data: event.target.result }).promise;
+                        let textContent = '';
+                        for (let i = 1; i <= Math.min(pdf.numPages, 5); i++) {
+                            const page = await pdf.getPage(i);
+                            const text = await page.getTextContent();
+                            textContent += text.items.map(s => s.str).join(' ');
+                        }
+                        
+                        processSyllabusData(textContent);
+                        status.textContent = "Syllabus processed successfully!";
+                    } catch (error) {
+                        status.textContent = `Error: ${error.message}`;
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            } catch (error) {
+                status.textContent = `Error: ${error.message}`;
+            }
+        }
+        
+        function processSyllabusData(text) {
+            // This would normally be AI-powered, but we'll simulate it
+            const subjects = [
+                { name: "Advanced Algorithms", credits: 4, gradePoint: 0, totalClasses: 0, attendedClasses: 0, internalMarks: 0 },
+                { name: "Machine Learning", credits: 4, gradePoint: 0, totalClasses: 0, attendedClasses: 0, internalMarks: 0 },
+                { name: "Database Systems", credits: 3, gradePoint: 0, totalClasses: 0, attendedClasses: 0, internalMarks: 0 }
+            ];
+            
+            currentUserData.subjects = subjects;
+            
+            // Add exam dates
+            const today = new Date();
+            if (!currentUserData.calendarEvents) currentUserData.calendarEvents = {};
+            currentUserData.calendarEvents[`${today.getFullYear()}-${today.getMonth() + 2}-15`] = { 
+                text: "Midterm Exams", 
+                type: "exam" 
+            };
+            currentUserData.calendarEvents[`${today.getFullYear()}-${today.getMonth() + 4}-10`] = { 
+                text: "Final Exams", 
+                type: "exam" 
+            };
+            
+            saveUserData();
+            updateAllUI();
+        }
+        
+        function applyTheme(theme) {
+            const htmlEl = document.documentElement;
+            if (theme === 'system') {
+                const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'synthwave' : 'cupcake';
+                htmlEl.setAttribute('data-theme', systemTheme);
+            } else {
+                htmlEl.setAttribute('data-theme', theme);
+            }
+            const themeSelector = document.getElementById('themeSelector');
+            if (themeSelector) {
+                themeSelector.value = theme;
+            }
+        }
+
+        // --- GAMIFICATION & FOCUS ---
+        function updateStreak() {
+            const today = new Date().toISOString().split('T')[0];
+            const lastCompleted = currentUserData.lastCompletedDate;
+            
+            if (lastCompleted === today) return;
+            
+            if (!lastCompleted || !isConsecutiveDay(lastCompleted, today)) {
+                currentUserData.studyStreak = 1;
+            } else {
+                currentUserData.studyStreak++;
+            }
+            
+            currentUserData.lastCompletedDate = today;
+            saveUserData();
+            updateHeaderMetrics();
+        }
+        
+        function isConsecutiveDay(prevDate, currentDate) {
+            const prev = new Date(prevDate);
+            const current = new Date(currentDate);
+            const diffTime = Math.abs(current - prev);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+            return diffDays === 1;
+        }
+        
+        function updateHeaderMetrics() {
+            document.getElementById('studyStreakDisplay').textContent = currentUserData.studyStreak || 0;
+            
+            // Simple ascend score calculation
+            const todosCompleted = (currentUserData.todos || []).filter(t => t.completed).length;
+            const materialsCount = Object.keys(currentUserData.studyMaterials || {}).length;
+            const score = currentUserData.studyStreak * 10 + todosCompleted * 5 + materialsCount * 3;
+            document.getElementById('ascendScoreDisplay').textContent = score;
+        }
+        
+        function startFocusTimer(duration, displayEl) {
+            let timer = duration * 60;
+            clearInterval(focusTimerInterval);
+            
+            focusTimerInterval = setInterval(() => {
+                const minutes = Math.floor(timer / 60);
+                const seconds = timer % 60;
+                
+                displayEl.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                
+                if (--timer < 0) {
+                    clearInterval(focusTimerInterval);
+                    displayEl.textContent = "Done!";
+                    new Audio('https://assets.mixkit.co/sfx/preview/mixkit-alarm-digital-clock-beep-989.mp3').play();
+                }
+            }, 1000);
+        }
+        
+        function showKnowledgeGraph() {
+            knowledgeGraphModal.classList.remove('hidden');
+            const container = document.getElementById('knowledgeGraphContainer');
+            container.innerHTML = '<div class="flex items-center justify-center h-full"><div class="text-center"><div class="loading loading-lg loading-spinner text-info"></div><p class="mt-4">Building knowledge graph...</p></div></div>';
+            
+            // Simulate graph generation
+            setTimeout(() => {
+                container.innerHTML = '<p class="text-center">Knowledge graph visualization would appear here.</p>';
+            }, 1500);
+        }
+        
+        function logKnowledgeGap(filename) {
+            const material = currentUserData.studyMaterials[filename];
+            if (!material || !material.concepts) return;
+
+            if (!currentUserData.knowledgeGaps) {
+                currentUserData.knowledgeGaps = [];
+            }
+
+            material.concepts.forEach(concept => {
+                currentUserData.knowledgeGaps.push({
+                    concept: concept,
+                    source: filename,
+                    date: new Date().toISOString()
+                });
+            });
+            
+            // Keep the list from getting too long
+            if (currentUserData.knowledgeGaps.length > 50) {
+                currentUserData.knowledgeGaps.shift();
+            }
+            saveUserData();
+            renderRecommendations();
+        }
+
+        function renderRecommendations() {
+            const container = document.getElementById('recommendationsContainer');
+            const gaps = currentUserData.knowledgeGaps || [];
+            if (gaps.length === 0) {
+                container.innerHTML = `<p class="text-base-content/50 text-sm p-4 text-center">No recommendations yet. Take some quizzes to identify knowledge gaps!</p>`;
+                return;
+            }
+
+            const counts = gaps.reduce((acc, gap) => {
+                acc[gap.concept] = (acc[gap.concept] || 0) + 1;
+                return acc;
+            }, {});
+
+            const sortedGaps = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 3);
+
+            if (sortedGaps.length === 0) {
+                 container.innerHTML = `<p class="text-base-content/50 text-sm p-4 text-center">You're on top of everything! Keep it up.</p>`;
+                 return;
+            }
+
+            container.innerHTML = '';
+            sortedGaps.forEach(([concept, count]) => {
+                const el = document.createElement('div');
+                el.className = 'bg-base-200 p-3 rounded-lg flex items-center justify-between';
+                el.innerHTML = `
+                    <div>
+                        <p class="font-semibold text-base-content">${concept}</p>
+                        <p class="text-xs text-base-content/50">Identified ${count} times</p>
+                    </div>
+                    <button class="btn btn-xs btn-primary btn-outline review-btn" data-concept="${concept}">Review</button>
+                `;
+                container.appendChild(el);
+            });
+        }
+
+        function startReviewSession(concept) {
+            openAiTutor();
+            aiTutorInput.value = `Can you explain the concept of "${concept}" to me simply?`;
+            sendAiChatMessage();
+        }
+
+        // --- NEW ATTENDANCE FEATURE ---
+        function renderAttendanceTracker() {
+            const subjects = currentUserData.subjects || [];
+            attendanceContainer.innerHTML = '';
+
+            if (subjects.length === 0) {
+                attendanceContainer.innerHTML = `<p class="text-base-content/50 text-sm p-4 text-center">Add subjects in the GPA tracker to see them here.</p>`;
+                return;
+            }
+
+            subjects.forEach((subject, index) => {
+                const total = parseInt(subject.totalClasses) || 0;
+                const attended = parseInt(subject.attendedClasses) || 0;
+                
+                const percentage = total > 0 ? (attended / total) * 100 : 0;
+                
+                let percentColor = 'text-success';
+                if (percentage < 80) percentColor = 'text-error';
+                else if (percentage < 85) percentColor = 'text-warning';
+
+                const maxAbsences = Math.floor(total * 0.2);
+                const currentAbsences = total - attended;
+                const buffer = maxAbsences - currentAbsences;
+
+                let bufferText = `${buffer} classes`;
+                if (buffer < 0) bufferText = `<span class="text-error">Deficit of ${Math.abs(buffer)}</span>`;
+
+                const el = document.createElement('div');
+                el.className = 'grid grid-cols-12 gap-2 items-center text-sm';
+                el.innerHTML = `
+                    <span class="col-span-4 truncate font-semibold text-base-content">${subject.name}</span>
+                    <input type="number" value="${total}" class="input input-bordered input-sm col-span-2 attendance-input" data-index="${index}" data-field="totalClasses">
+                    <input type="number" value="${attended}" class="input input-bordered input-sm col-span-2 attendance-input" data-index="${index}" data-field="attendedClasses">
+                    <span class="col-span-2 text-center font-bold ${percentColor}">${percentage.toFixed(1)}%</span>
+                    <span class="col-span-2 text-center">${bufferText}</span>
+                `;
+                attendanceContainer.appendChild(el);
+            });
+        }
+
+        function handleAttendanceChange(e) {
+            const { index, field } = e.target.dataset;
+            if (index !== undefined && field) {
+                currentUserData.subjects[index][field] = parseInt(e.target.value) || 0;
+            }
+            renderAttendanceTracker();
+            saveUserData();
+        }
+        
+        function startExamCountdown() {
+            if (!currentUserData.examTimers || currentUserData.examTimers.length === 0) return;
+            
+            const exam = currentUserData.examTimers[0];
+            const examDate = new Date(exam.date);
+            const today = new Date();
+            const diffTime = examDate - today;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            if (diffDays > 0) {
+                document.getElementById('examOverdriveBtn').innerHTML = `<i class="fa-solid fa-bolt mr-2"></i>Exam Overdrive (${diffDays}d`;
+            }
+        }
+
+        // --- EVENT LISTENERS ---
+        window.onload = () => {
+            // Assign DOM elements
+            loginOverlay = document.getElementById('loginOverlay');
+            appContainer = document.getElementById('appContainer');
+            loadingOverlay = document.getElementById('loadingOverlay');
+            sgpaDisplay = document.getElementById('sgpaDisplay'); 
+            subjectsContainer = document.getElementById('subjectsContainer'); 
+            todoListContainer = document.getElementById('todoListContainer'); 
+            todoInput = document.getElementById('todoInput'); 
+            calendarGrid = document.getElementById('calendarGrid'); 
+            calendarHeader = document.getElementById('calendarHeader'); 
+            aiTutorModal = document.getElementById('aiTutorModal'); 
+            eventModal = document.getElementById('eventModal'); 
+            briefingModal = document.getElementById('briefingModal'); 
+            studyAidModal = document.getElementById('studyAidModal'); 
+            audioPlayerModal = document.getElementById('audioPlayerModal'); 
+            settingsModal = document.getElementById('settingsModal'); 
+            analyticsModal = document.getElementById('analyticsModal'); 
+            focusModal = document.getElementById('focusModal'); 
+            knowledgeGraphModal = document.getElementById('knowledgeGraphModal');
+            attendanceContainer = document.getElementById('attendanceContainer');
+            marksForecasterContainer = document.getElementById('marksForecasterContainer');
+            briefingContent = document.getElementById('briefingContent'); 
+            briefingLoading = document.getElementById('briefingLoading'); 
+            studyAidTitle = document.getElementById('studyAidTitle'); 
+            studyAidContent = document.getElementById('studyAidContent'); 
+            audioPlayerTitle = document.getElementById('audioPlayerTitle'); 
+            audioPlayerStatus = document.getElementById('audioPlayerStatus'); 
+            audioPlayerControls = document.getElementById('audioPlayerControls');
+            eventModalDate = document.getElementById('eventModalDate'); 
+            eventText = document.getElementById('eventText'); 
+            absenceCheckbox = document.getElementById('absenceCheckbox'); 
+            aiTutorContent = document.getElementById('aiTutorContent'); 
+            aiTutorInput = document.getElementById('aiTutorInput'); 
+            aiTutorLoading = document.getElementById('aiTutorLoading'); 
+            aiTutorActions = document.getElementById('aiTutorActions');
+
+            // Setup listeners
+            document.getElementById('authButton').addEventListener('click', handleAuthAction);
+            document.getElementById('authToggleText').addEventListener('click', toggleAuthMode);
+            document.getElementById('signInWithGoogleBtn').addEventListener('click', signInWithGoogle);
+            document.getElementById('signOutBtn').addEventListener('click', appSignOut);
+            
+            document.getElementById('gpaCalculator').addEventListener('input', handleGpaChange);
+            document.getElementById('addSubjectBtn').addEventListener('click', addSubject);
+            document.getElementById('gpaCalculator').addEventListener('click', (e) => { if (e.target.classList.contains('delete-subject-btn')) deleteSubject(e.target.dataset.index); });
+            document.getElementById('attendanceTracker').addEventListener('input', handleAttendanceChange);
+            document.getElementById('marksForecaster').addEventListener('input', handleMarksForecasterChange); // NEW
+            document.getElementById('todoSection').addEventListener('click', handleTodoAction);
+            document.getElementById('prevMonthBtn').addEventListener('click', () => changeMonth(-1));
+            document.getElementById('nextMonthBtn').addEventListener('click', () => changeMonth(1));
+            calendarGrid.addEventListener('click', (e) => { if (e.target.classList.contains('calendar-day')) openEventModal(e.target.dataset.date); });
+            document.getElementById('saveEventBtn').addEventListener('click', saveEvent);
+            document.getElementById('closeEventModalBtn').addEventListener('click', () => eventModal.classList.add('hidden'));
+            document.getElementById('openAiTutorBtn').addEventListener('click', openAiTutor);
+            document.getElementById('closeAiTutorBtn').addEventListener('click', () => aiTutorModal.classList.add('hidden'));
+            document.getElementById('sendAiMsgBtn').addEventListener('click', sendAiChatMessage);
+            aiTutorInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendAiChatMessage(); });
+            document.getElementById('clearAiChatBtn').addEventListener('click', clearAiChat);
+            document.getElementById('fileUpload').addEventListener('change', handleFileUpload);
+            document.getElementById('knowledgeBase').addEventListener('click', (e) => { if (e.target.closest('.delete-material-btn')) deleteMaterial(e.target.closest('.delete-material-btn').dataset.filename); if (e.target.closest('.study-aid-btn')) generateStudyAids(e.target.closest('.study-aid-btn').dataset.filename, e.target.closest('.study-aid-btn').dataset.type); });
+            document.getElementById('showBriefingBtn').addEventListener('click', showLastBriefing);
+            document.getElementById('closeBriefingBtn').addEventListener('click', () => briefingModal.classList.add('hidden'));
+            document.getElementById('closeStudyAidBtn').addEventListener('click', () => studyAidModal.classList.add('hidden'));
+            document.getElementById('closeAudioPlayerBtn').addEventListener('click', () => { speechSynthesis.cancel(); audioPlayerModal.classList.add('hidden'); });
+            document.getElementById('openSettingsBtn').addEventListener('click', () => { settingsModal.classList.remove('hidden'); document.getElementById('themeSelector').value = currentUserData.theme || 'system'; });
+            document.getElementById('closeSettingsBtn').addEventListener('click', () => settingsModal.classList.add('hidden'));
+            document.getElementById('saveSettingsBtn').addEventListener('click', () => { const newTheme = document.getElementById('themeSelector').value; currentUserData.theme = newTheme; applyTheme(newTheme); saveUserData(); settingsModal.classList.add('hidden'); });
+            document.getElementById('themeSelector').addEventListener('change', (e) => applyTheme(e.target.value));
+            document.getElementById('openAnalyticsBtn').addEventListener('click', showAnalytics);
+            document.getElementById('closeAnalyticsBtn').addEventListener('click', () => analyticsModal.classList.add('hidden'));
+            document.getElementById('archiveSemesterBtn').addEventListener('click', archiveSemester);
+            document.getElementById('examOverdriveBtn').addEventListener('click', activateExamOverdrive);
+            document.getElementById('syllabusUpload').addEventListener('change', handleSyllabusUpload);
+            document.getElementById('openKnowledgeGraphBtn').addEventListener('click', showKnowledgeGraph);
+            document.getElementById('closeKnowledgeGraphBtn').addEventListener('click', () => knowledgeGraphModal.classList.add('hidden'));
+            document.getElementById('openFocusBtn').addEventListener('click', () => focusModal.classList.remove('hidden'));
+            document.getElementById('closeFocusBtn').addEventListener('click', () => { clearInterval(focusTimerInterval); focusModal.classList.add('hidden'); });
+            document.getElementById('startFocusTimerBtn').addEventListener('click', () => {
+                const duration = document.getElementById('focusDuration').value;
+                const display = document.getElementById('focusTimeDisplay');
+                startFocusTimer(duration, display);
+            });
+            document.getElementById('recommendationsContainer').addEventListener('click', (e) => {
+                if (e.target.classList.contains('review-btn')) {
+                    startReviewSession(e.target.dataset.concept);
+                }
+            });
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+                if (currentUserData.theme === 'system') {
+                    applyTheme('system');
+                }
+            });
+            
+            setupAuth();
+        };
+    </script>
+</body>
+</html>
